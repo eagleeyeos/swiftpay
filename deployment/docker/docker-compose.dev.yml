@@ -1,0 +1,475 @@
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: swiftpayme-postgres-dev
+    environment:
+      POSTGRES_DB: swiftpayme
+      POSTGRES_USER: swiftpayme
+      POSTGRES_PASSWORD: swiftpayme123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - swiftpayme-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swiftpayme"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: swiftpayme-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - swiftpayme-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mongodb:
+    image: mongo:6
+    container_name: swiftpayme-mongodb-dev
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: swiftpayme
+      MONGO_INITDB_ROOT_PASSWORD: swiftpayme123
+      MONGO_INITDB_DATABASE: swiftpayme
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - swiftpayme-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/swiftpayme --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # Message Queue
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: swiftpayme-kafka-dev
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - swiftpayme-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: swiftpayme-zookeeper-dev
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - swiftpayme-network
+
+  # Monitoring and Logging
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: swiftpayme-prometheus-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - swiftpayme-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: swiftpayme-grafana-dev
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - swiftpayme-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: swiftpayme-elasticsearch-dev
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - swiftpayme-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: swiftpayme-kibana-dev
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks:
+      - swiftpayme-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ../../microservices/api-gateway
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-api-gateway-dev
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: development
+      PORT: 8000
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MONGODB_URI: mongodb://swiftpayme:swiftpayme123@mongodb:27017/swiftpayme
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+      - kafka
+    volumes:
+      - ../../microservices/api-gateway:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  # Core Microservices
+  user-service:
+    build:
+      context: ../../microservices/user-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-user-service-dev
+    ports:
+      - "8001:8001"
+    environment:
+      NODE_ENV: development
+      PORT: 8001
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    volumes:
+      - ../../microservices/user-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  transaction-service:
+    build:
+      context: ../../microservices/transaction-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-transaction-service-dev
+    ports:
+      - "8002:8002"
+    environment:
+      NODE_ENV: development
+      PORT: 8002
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    volumes:
+      - ../../microservices/transaction-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  billing-service:
+    build:
+      context: ../../microservices/billing-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-billing-service-dev
+    ports:
+      - "8003:8003"
+    environment:
+      NODE_ENV: development
+      PORT: 8003
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    volumes:
+      - ../../microservices/billing-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  ledger-service:
+    build:
+      context: ../../microservices/ledger-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-ledger-service-dev
+    ports:
+      - "8004:8004"
+    environment:
+      NODE_ENV: development
+      PORT: 8004
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    volumes:
+      - ../../microservices/ledger-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  tokenization-service:
+    build:
+      context: ../../microservices/tokenization-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-tokenization-service-dev
+    ports:
+      - "8005:8005"
+    environment:
+      NODE_ENV: development
+      PORT: 8005
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MONGODB_URI: mongodb://swiftpayme:swiftpayme123@mongodb:27017/swiftpayme
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+      - kafka
+    volumes:
+      - ../../microservices/tokenization-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  crypto-service:
+    build:
+      context: ../../microservices/crypto-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-crypto-service-dev
+    ports:
+      - "8006:8006"
+    environment:
+      NODE_ENV: development
+      PORT: 8006
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+      BITCOIN_RPC_HOST: bitcoin-core
+      BITCOIN_RPC_PORT: 8332
+      BITCOIN_RPC_USER: swiftpayme
+      BITCOIN_RPC_PASSWORD: swiftpayme123
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+      - bitcoin-core
+    volumes:
+      - ../../microservices/crypto-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  currency-conversion:
+    build:
+      context: ../../microservices/currency-conversion
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-currency-conversion-dev
+    ports:
+      - "8007:8007"
+    environment:
+      NODE_ENV: development
+      PORT: 8007
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    volumes:
+      - ../../microservices/currency-conversion:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  api-service:
+    build:
+      context: ../../microservices/api-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-api-service-dev
+    ports:
+      - "8008:8008"
+    environment:
+      NODE_ENV: development
+      PORT: 8008
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    volumes:
+      - ../../microservices/api-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  admin-service:
+    build:
+      context: ../../microservices/admin-service
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-admin-service-dev
+    ports:
+      - "8009:8009"
+    environment:
+      NODE_ENV: development
+      PORT: 8009
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MONGODB_URI: mongodb://swiftpayme:swiftpayme123@mongodb:27017/swiftpayme
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+      - kafka
+    volumes:
+      - ../../microservices/admin-service:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  # Bitcoin Core for crypto operations
+  bitcoin-core:
+    image: ruimarinho/bitcoin-core:latest
+    container_name: swiftpayme-bitcoin-core-dev
+    ports:
+      - "8332:8332"
+      - "8333:8333"
+    environment:
+      BITCOIN_DATA: /data
+    volumes:
+      - bitcoin_data:/data
+    command: >
+      bitcoind
+      -regtest
+      -server
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -rpcuser=swiftpayme
+      -rpcpassword=swiftpayme123
+      -fallbackfee=0.0002
+    networks:
+      - swiftpayme-network
+
+  # Frontend Applications
+  web-ui:
+    build:
+      context: ../../ui/web-ui
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-web-ui-dev
+    ports:
+      - "3001:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_WS_URL: ws://localhost:8000
+    volumes:
+      - ../../ui/web-ui:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+  admin-ui:
+    build:
+      context: ../../ui/admin-ui
+      dockerfile: Dockerfile.dev
+    container_name: swiftpayme-admin-ui-dev
+    ports:
+      - "3002:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_ADMIN_API_URL: http://localhost:8009
+    volumes:
+      - ../../ui/admin-ui:/app
+      - /app/node_modules
+    networks:
+      - swiftpayme-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data:
+  kafka_data:
+  zookeeper_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+  bitcoin_data:
+
+networks:
+  swiftpayme-network:
+    driver: bridge
+

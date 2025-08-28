@@ -1,0 +1,65 @@
+{
+  "name": "swiftpayme",
+  "version": "1.0.0",
+  "description": "Comprehensive microservices-based financial system with payment processing, tokenization, and crypto support",
+  "main": "index.js",
+  "scripts": {
+    "dev": "docker-compose -f deployment/docker/docker-compose.dev.yml up",
+    "prod": "docker-compose -f deployment/docker/docker-compose.prod.yml up -d",
+    "build": "npm run build:services && npm run build:ui",
+    "build:services": "cd microservices && npm run build:all",
+    "build:ui": "cd ui && npm run build:all",
+    "test": "npm run test:services && npm run test:ui",
+    "test:services": "cd microservices && npm run test:all",
+    "test:ui": "cd ui && npm run test:all",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "format": "prettier --write .",
+    "setup": "npm run setup:services && npm run setup:ui",
+    "setup:services": "cd microservices && npm run setup:all",
+    "setup:ui": "cd ui && npm run setup:all",
+    "clean": "npm run clean:services && npm run clean:ui && docker system prune -f",
+    "clean:services": "cd microservices && npm run clean:all",
+    "clean:ui": "cd ui && npm run clean:all"
+  },
+  "workspaces": [
+    "microservices/*",
+    "ui/*",
+    "shared/*"
+  ],
+  "keywords": [
+    "fintech",
+    "payments",
+    "microservices",
+    "blockchain",
+    "tokenization",
+    "cryptocurrency",
+    "financial-services"
+  ],
+  "author": "SwiftPayme Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "concurrently": "^8.0.0",
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/swiftpayme/swiftpayme.git"
+  },
+  "bugs": {
+    "url": "https://github.com/swiftpayme/swiftpayme/issues"
+  },
+  "homepage": "https://github.com/swiftpayme/swiftpayme#readme"
+}
+
