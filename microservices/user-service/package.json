@@ -1,0 +1,58 @@
+{
+  "name": "user-service",
+  "version": "1.0.0",
+  "description": "SwiftPayme User Management Service",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "morgan": "^1.10.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "joi": "^17.9.2",
+    "pg": "^8.11.3",
+    "redis": "^4.6.7",
+    "kafkajs": "^2.2.4",
+    "winston": "^3.10.0",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/cors": "^2.8.13",
+    "@types/morgan": "^1.9.4",
+    "@types/bcryptjs": "^2.4.2",
+    "@types/jsonwebtoken": "^9.0.2",
+    "@types/pg": "^8.10.2",
+    "@types/uuid": "^9.0.2",
+    "@types/node": "^20.4.5",
+    "typescript": "^5.1.6",
+    "ts-node-dev": "^2.0.0",
+    "jest": "^29.6.2",
+    "@types/jest": "^29.5.3",
+    "eslint": "^8.45.0",
+    "@typescript-eslint/eslint-plugin": "^6.2.1",
+    "@typescript-eslint/parser": "^6.2.1"
+  },
+  "keywords": [
+    "microservice",
+    "user-management",
+    "authentication",
+    "nodejs",
+    "typescript",
+    "swiftpayme"
+  ],
+  "author": "SwiftPayme Development Team",
+  "license": "MIT"
+}
+

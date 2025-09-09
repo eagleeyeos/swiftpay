@@ -1,0 +1,34 @@
+{
+  "name": "transaction-service",
+  "version": "1.0.0",
+  "description": "SwiftPayme Transaction Processing Service",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "morgan": "^1.10.0",
+    "joi": "^17.9.2",
+    "pg": "^8.11.3",
+    "redis": "^4.6.7",
+    "kafkajs": "^2.2.4",
+    "winston": "^3.10.0",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.4.5",
+    "typescript": "^5.1.6",
+    "ts-node-dev": "^2.0.0"
+  },
+  "author": "SwiftPayme Development Team",
+  "license": "MIT"
+}
+

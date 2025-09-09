@@ -1,0 +1,24 @@
+{
+  "name": "ledger-service",
+  "version": "1.0.0",
+  "description": "SwiftPayme ledger-service",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.4.5",
+    "typescript": "^5.1.6"
+  },
+  "author": "SwiftPayme Development Team",
+  "license": "MIT"
+}
