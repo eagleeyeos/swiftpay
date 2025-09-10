@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # Databases
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: swiftpayme
+      POSTGRES_USER: swiftpayme
+      POSTGRES_PASSWORD: swiftpayme123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - swiftpayme-network
+
+  mongodb:
+    image: mongo:6-alpine
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: swiftpayme
+      MONGO_INITDB_ROOT_PASSWORD: swiftpayme123
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - swiftpayme-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - swiftpayme-network
+
+  # Message Queue
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - swiftpayme-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - swiftpayme-network
+
+  # Microservices
+  api-gateway:
+    build:
+      context: ./microservices/api-gateway
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - PORT=8000
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - swiftpayme-network
+
+  user-service:
+    build:
+      context: ./microservices/user-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=development
+      - PORT=8001
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - swiftpayme-network
+
+  account-service:
+    build:
+      context: ./microservices/account-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8010:8010"
+    environment:
+      - NODE_ENV=development
+      - PORT=8010
+    depends_on:
+      - postgres
+      - mongodb
+      - redis
+    networks:
+      - swiftpayme-network
+
+  transaction-service:
+    build:
+      context: ./microservices/transaction-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8002:8002"
+    environment:
+      - NODE_ENV=development
+      - PORT=8002
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - swiftpayme-network
+
+  # Web UI
+  web-ui:
+    build:
+      context: ./ui/swiftpayme-web-ui
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - api-gateway
+    networks:
+      - swiftpayme-network
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+
+networks:
+  swiftpayme-network:
+    driver: bridge
+
